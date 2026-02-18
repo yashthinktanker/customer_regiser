@@ -15,13 +15,13 @@ class CustomerRegister(models.Model):
         return self.first_name
     
 class Age(models.Model):
-    user_id=models.ForeignKey(CustomerRegister,on_delete=models.CASCADE)
+    user_id=models.OneToOneField(CustomerRegister,on_delete=models.CASCADE,related_name='age')
     age=models.IntegerField()
 
  
 
 class Hobbies(models.Model):
-    user_id=models.ForeignKey(CustomerRegister,on_delete=models.CASCADE)
+    user_id=models.ForeignKey(CustomerRegister,on_delete=models.CASCADE,related_name='hobby')
     hobby = models.CharField(max_length=50)
 
 
