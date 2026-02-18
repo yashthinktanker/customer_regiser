@@ -1,11 +1,13 @@
 from django.shortcuts import render,redirect
-from datetime import date,datetime
+from datetime import date,datetime, timedelta
 import requests
 import random
 import string
 from django.contrib.auth.hashers import make_password,check_password
 from .models import *
 from django.core.mail import EmailMessage,send_mail
+
+from django.core.paginator import Paginator,EmptyPage,PageNotAnInteger
 # ---------- AGE CALCULATION -----------
 def age(customer):
     today=date.today()
@@ -131,8 +133,12 @@ def login(request):
             request.session['cust_id'] = customer.id
 
             # Generate OTP
-            otp = random.randint(10000, 99999)
+            otp = random.randint(100000, 999999)
+            print('otp: ', otp)
             request.session['otp'] = otp
+            request.session['otp_expire'] = (
+                datetime.now() + timedelta(seconds=43)
+            ).timestamp()
 
             send_mail(
                 'OTP Verification',
@@ -160,6 +166,12 @@ def otp_verify(request):
             otp_session = request.session.get('otp')
             print('otp_session: ', otp_session) 
 
+            otp_expire=request.session.get('otp_expire')
+            if  not otp_expire or datetime.now().timestamp() > otp_expire:
+                request.session['otp_expire']=''
+                return render(request, 'otp.html', {'error': 'OTP Expired'})
+
+
             if otp_session == int(otp_input):
                 request.session['otp'] = ''
                 return redirect('/')  
@@ -167,8 +179,13 @@ def otp_verify(request):
                 # raise invalideotp("Invalid OTP")
                 return render(request, 'otp.html', {'error': 'Invalid OTP'})  
         elif action == "resend":
-            otp = random.randint(10000,99999)
+            otp = random.randint(100000,999999)
+            print('resend - otp: ', otp)
             request.session['otp']=otp
+            request.session['otp_expire'] = (
+                datetime.now() + timedelta(seconds=43)
+            ).timestamp()
+  
             send_mail(
                 'OTP Verification',
                 f'Your OTP is {otp}',
@@ -178,3 +195,10 @@ def otp_verify(request):
             return render(request, 'otp.html')
 
     return render(request, 'otp.html')
+
+
+def customer_list(request):
+    c=CustomerRegister.objects.prefetch_related('age', 'hobby')
+    x={'customer':c}
+    return render(request, 'customer_list.html',x)
+
