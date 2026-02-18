@@ -199,6 +199,17 @@ def otp_verify(request):
 
 def customer_list(request):
     c=CustomerRegister.objects.prefetch_related('age', 'hobby')
+    pag=Paginator(c,1)
+    page=request.GET.get('page')
+    try:
+        c=pag.page(page)
+        # print('try c: ', c)
+    except PageNotAnInteger:
+        c=pag.page(1)
+        # print('PageNotAnInteger c: ', c)
+    except EmptyPage:
+        c=pag.page(pag.num_pages)    
+        # print('EmptyPage c: ', c)
     x={'customer':c}
     return render(request, 'customer_list.html',x)
 
