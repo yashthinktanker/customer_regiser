@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render,redirect
 from datetime import date,datetime
 import requests
 import random
@@ -61,10 +61,11 @@ def home(request):
         data=res.json()
 
         # Random password
-        password=random_password(6)
+        passwords=random_password(6)
     
         email=request.POST.get('email')
         mobile=request.POST.get('number')
+        
         udate=request.POST.get('dates')
         hobby=request.POST.getlist('check[]')
         print('hobby: ', hobby)
@@ -77,6 +78,7 @@ def home(request):
             last_name=ln,
             email=email,
             mobile_no=mobile,
+            password=passwords,
             dob=x,
             gender=data['gender']
         )
@@ -103,7 +105,7 @@ def home(request):
                 Your Login Details:
 
                 Email    : {email}
-                Password : {password}
+                Password : {passwords}
 
                 Thank You.
             """,
@@ -111,7 +113,68 @@ def home(request):
             [email], 
         ).send()
         
-        x={'fn':fn,'ln':ln,'email':email,'mobile':mobile,'udate':udate,'data':data,'password':password} 
-        return render(request,'home.html',x)
+        # x={'fn':fn,'ln':ln,'email':email,'mobile':mobile,'udate':udate,'data':data,'password':password} 
+        return render(request,'login.html')
     return render(request,'home.html')
 
+def login(request):
+    if request.method == "POST":
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+
+        customer = CustomerRegister.objects.filter(
+            email=email,
+            password=password
+        ).first()
+
+        if customer:
+            request.session['cust_id'] = customer.id
+
+            # Generate OTP
+            otp = random.randint(10000, 99999)
+            request.session['otp'] = otp
+
+            send_mail(
+                'OTP Verification',
+                f'Your OTP is {otp}',
+                None,
+                [customer.email],
+            )
+
+            return redirect('/otp')
+        else:
+            return render(request, 'login.html', {'error': 'Invalid credentials'})
+
+    return render(request, 'login.html')
+
+
+def otp_verify(request):
+    cust_id = request.session.get('cust_id')
+    customer = CustomerRegister.objects.get(id=cust_id)
+    if request.method == 'POST':
+        action=request.POST.get('action')
+        if action == "verify":
+            otp_input = request.POST.get('otpget')
+            print('otp_input: ', otp_input)
+            
+            otp_session = request.session.get('otp')
+            print('otp_session: ', otp_session) 
+
+            if otp_session == int(otp_input):
+                request.session['otp'] = ''
+                return redirect('/')  
+            else:
+                # raise invalideotp("Invalid OTP")
+                return render(request, 'otp.html', {'error': 'Invalid OTP'})  
+        elif action == "resend":
+            otp = random.randint(10000,99999)
+            request.session['otp']=otp
+            send_mail(
+                'OTP Verification',
+                f'Your OTP is {otp}',
+                None,
+                [customer.email],   
+            )
+            return render(request, 'otp.html')
+
+    return render(request, 'otp.html')
