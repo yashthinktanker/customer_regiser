@@ -7,7 +7,7 @@ class CustomerRegister(models.Model):
     last_name=models.CharField(max_length=15)
     email=models.EmailField()
     password=models.CharField(max_length=15,default="")
-    mobile_no=models.IntegerField()
+    mobile_no=models.BigIntegerField()
     dob=models.DateField()
     gender=models.CharField(max_length=7)
 

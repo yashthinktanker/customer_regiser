@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import render,redirect
 from datetime import date,datetime, timedelta
 import requests
@@ -6,6 +7,7 @@ import string
 from django.contrib.auth.hashers import make_password,check_password
 from .models import *
 from django.core.mail import EmailMessage,send_mail
+import re
 
 from django.core.paginator import Paginator,EmptyPage,PageNotAnInteger
 # ---------- AGE CALCULATION -----------
@@ -53,10 +55,11 @@ def random_password(length):
 
 
 def home(request):
-    if request.method == "POST":
-        
+    if request.method == "POST" :
+
         fn=request.POST.get('fn')
         ln=request.POST.get('ln')
+
         # FETCH GENDER
         url= f"https://api.genderize.io/?name={ln}"
         res=requests.get(url)
@@ -71,6 +74,35 @@ def home(request):
         udate=request.POST.get('dates')
         hobby=request.POST.getlist('check[]')
         print('hobby: ', hobby)
+        listof_error=[]
+        if not fn:
+            error="First name was reqired"
+            listof_error.append(error)
+        if not ln:
+            error="Last name was reqired"
+            listof_error.append(error)
+        if email:
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com|in)$'
+            if not re.match(email_pattern, email):
+                error="Proper email_Id set"
+                listof_error.append(error)
+        elif not email :
+            error="email required"
+            listof_error.append(error)
+            
+            
+        if len(mobile) != 10:
+            error="pls enter 10 digit phone number"
+            listof_error.append(error)
+        
+        if not udate :
+            error="pls enter date"
+            listof_error.append(error)
+            
+        if len(listof_error) !=  0:         
+            x={'error':listof_error}
+            return render(request,'home.html',x)
+        
         x = datetime.strptime(udate, "%Y-%m-%d").date()
         ages=age(x)
 
@@ -89,11 +121,12 @@ def home(request):
             user_id=customer,
             age=ages
         )
-        hobby_string = ", ".join(hobby)
-        Hobbies.objects.create(
-                user_id=customer,
-                hobby=hobby_string
-            )
+        if len(hobby) != 0 : 
+            hobby_string = ", ".join(hobby)
+            Hobbies.objects.create(
+                    user_id=customer,
+                    hobby=hobby_string
+                )
         # for h in hobby:
         #     Hobbies.objects.create(
         #         user_id=customer,
@@ -119,6 +152,84 @@ def home(request):
         return render(request,'login.html')
     return render(request,'home.html')
 
+# def login(request):
+#     if request.method == "POST":
+#         email = request.POST.get('email')
+#         password = request.POST.get('password')
+
+#         customer = CustomerRegister.objects.filter(
+#             email=email,
+#             password=password
+#         ).first()
+
+#         if customer:
+#             request.session['cust_id'] = customer.id
+
+#             # Generate OTP
+#             otp = random.randint(100000, 999999)
+#             print('otp: ', otp)
+#             request.session['otp'] = otp
+#             request.session['otp_expire'] = (
+#                 datetime.now() + timedelta(seconds=43)
+#             ).timestamp()
+
+#             send_mail(
+#                 'OTP Verification',
+#                 f'Your OTP is {otp}',
+#                 None,
+#                 [customer.email],
+#             )
+
+#             return redirect('/otp')
+#         else:
+#             return render(request, 'login.html', {'error': 'Invalid credentials'})
+
+#     return render(request, 'login.html')
+
+
+# def otp_verify(request):
+#     cust_id = request.session.get('cust_id')
+#     customer = CustomerRegister.objects.get(id=cust_id)
+#     if request.method == 'POST':
+#         action=request.POST.get('action')
+#         if action == "verify":
+#             otp_input = request.POST.get('otpget')
+#             print('otp_input: ', otp_input)
+            
+#             otp_session = request.session.get('otp')
+#             print('otp_session: ', otp_session) 
+
+#             otp_expire=request.session.get('otp_expire')
+#             if  not otp_expire or datetime.now().timestamp() > otp_expire:
+#                 request.session['otp_expire']=''
+#                 return render(request, 'otp.html', {'error': 'OTP Expired'})
+
+
+#             if otp_session == int(otp_input):
+#                 request.session['otp'] = ''
+#                 return redirect('/')  
+#             else:
+#                 # raise invalideotp("Invalid OTP")
+#                 return render(request, 'otp.html', {'error': 'Invalid OTP'})  
+#         elif action == "resend":
+#             otp = random.randint(100000,999999)
+#             print('resend - otp: ', otp)
+#             request.session['otp']=otp
+#             request.session['otp_expire'] = (
+#                 datetime.now() + timedelta(seconds=43)
+#             ).timestamp()
+  
+#             send_mail(
+#                 'OTP Verification',
+#                 f'Your OTP is {otp}',
+#                 None,
+#                 [customer.email],   
+#             )
+#             return render(request, 'otp.html')
+
+#     return render(request, 'otp.html')
+
+
 def login(request):
     if request.method == "POST":
         email = request.POST.get('email')
@@ -136,65 +247,32 @@ def login(request):
             otp = random.randint(100000, 999999)
             print('otp: ', otp)
             request.session['otp'] = otp
-            request.session['otp_expire'] = (
-                datetime.now() + timedelta(seconds=43)
-            ).timestamp()
-
             send_mail(
                 'OTP Verification',
                 f'Your OTP is {otp}',
                 None,
                 [customer.email],
             )
-
-            return redirect('/otp')
+            return redirect('/otp2')
         else:
             return render(request, 'login.html', {'error': 'Invalid credentials'})
 
     return render(request, 'login.html')
 
 
-def otp_verify(request):
-    cust_id = request.session.get('cust_id')
-    customer = CustomerRegister.objects.get(id=cust_id)
-    if request.method == 'POST':
-        action=request.POST.get('action')
-        if action == "verify":
-            otp_input = request.POST.get('otpget')
-            print('otp_input: ', otp_input)
-            
-            otp_session = request.session.get('otp')
-            print('otp_session: ', otp_session) 
+def otp_verify2(request):
+    if request.method == "POST":
+        otp_session=request.session.get('otp')
+        print('otp_session: ', type(otp_session))
+        otp_input=request.POST.get('otpget')
+        print('otp_input: ', type(otp_input))
 
-            otp_expire=request.session.get('otp_expire')
-            if  not otp_expire or datetime.now().timestamp() > otp_expire:
-                request.session['otp_expire']=''
-                return render(request, 'otp.html', {'error': 'OTP Expired'})
-
-
-            if otp_session == int(otp_input):
-                request.session['otp'] = ''
-                return redirect('/')  
-            else:
-                # raise invalideotp("Invalid OTP")
-                return render(request, 'otp.html', {'error': 'Invalid OTP'})  
-        elif action == "resend":
-            otp = random.randint(100000,999999)
-            print('resend - otp: ', otp)
-            request.session['otp']=otp
-            request.session['otp_expire'] = (
-                datetime.now() + timedelta(seconds=43)
-            ).timestamp()
-  
-            send_mail(
-                'OTP Verification',
-                f'Your OTP is {otp}',
-                None,
-                [customer.email],   
-            )
-            return render(request, 'otp.html')
-
-    return render(request, 'otp.html')
+        if int(otp_input) == otp_session:
+            request.session['otp'] = ''
+            return redirect('/')
+        else:
+            return render(request, 'otp2.html', {'error': 'Invalid OTP'})
+    return render(request, 'otp2.html')
 
 
 def customer_list(request):
