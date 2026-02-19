@@ -53,7 +53,7 @@ def random_password(length):
            
 
 
-
+email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com|in)$'
 def home(request):
     if request.method == "POST" :
 
@@ -67,6 +67,7 @@ def home(request):
 
         # Random password
         passwords=random_password(6)
+        print('passwords: ', passwords)
     
         email=request.POST.get('email')
         mobile=request.POST.get('number')
@@ -81,17 +82,24 @@ def home(request):
         if not ln:
             error="Last name was reqired"
             listof_error.append(error)
-        if email:
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com|in)$'
+        if email:   
             if not re.match(email_pattern, email):
                 error="Proper email_Id set"
                 listof_error.append(error)
+        if CustomerRegister.objects.get(email=email):
+            error="Used diffrent email ID "
+            listof_error.append(error)
+
         elif not email :
             error="email required"
             listof_error.append(error)
             
-            
-        if len(mobile) != 10:
+
+        if not mobile:
+            error="pls enter phone number"
+            listof_error.append(error)
+
+        elif len(mobile) != 10:
             error="pls enter 10 digit phone number"
             listof_error.append(error)
         
@@ -99,57 +107,62 @@ def home(request):
             error="pls enter date"
             listof_error.append(error)
             
+        if  len(hobby) == 0:
+            error="At list One hobby select"
+            listof_error.append(error)
+            
         if len(listof_error) !=  0:         
             x={'error':listof_error}
             return render(request,'home.html',x)
-        
-        x = datetime.strptime(udate, "%Y-%m-%d").date()
-        ages=age(x)
+        else:
+            x = datetime.strptime(udate, "%Y-%m-%d").date()
+            ages=age(x)
 
-        # DATA Save Into Database
-        customer = CustomerRegister.objects.create(
-            first_name=fn,
-            last_name=ln,
-            email=email,
-            mobile_no=mobile,
-            password=passwords,
-            dob=x,
-            gender=data['gender']
-        )
+            # DATA Save Into Database
+            customer = CustomerRegister.objects.create(
+                first_name=fn,
+                last_name=ln,
+                email=email,
+                mobile_no=mobile,
+                password=make_password(passwords),
+                dob=x,
+                gender=data['gender']
+            )
 
-        Age.objects.create(
-            user_id=customer,
-            age=ages
-        )
-        if len(hobby) != 0 : 
+            Age.objects.create(
+                user_id=customer,
+                age=ages
+            )
             hobby_string = ", ".join(hobby)
             Hobbies.objects.create(
                     user_id=customer,
                     hobby=hobby_string
                 )
-        # for h in hobby:
-        #     Hobbies.objects.create(
-        #         user_id=customer,
-        #         hobby=h
-        #     )
-        EmailMessage(
-            "Verification Mail Login credential",
-            f"""
-                Hello User,
-
-                Your Login Details:
-
-                Email    : {email}
-                Password : {passwords}
-
-                Thank You.
-            """,
-            None,
-            [email], 
-        ).send()
         
-        # x={'fn':fn,'ln':ln,'email':email,'mobile':mobile,'udate':udate,'data':data,'password':password} 
-        return render(request,'login.html')
+
+            # for h in hobby:
+            #     Hobbies.objects.create(
+            #         user_id=customer,
+            #         hobby=h
+            #     )
+            EmailMessage(
+                "Verification Mail Login credential",
+                f"""
+                    Hello User,
+
+                    Your Login Details:
+
+                    Email    : {email}
+                    Password : {passwords}
+
+                    Thank You.
+                """,
+                None,
+                [email], 
+            ).send()
+            
+            # x={'fn':fn,'ln':ln,'email':email,'mobile':mobile,'udate':udate,'data':data,'password':password} 
+            return render(request,'login.html')
     return render(request,'home.html')
 
 # def login(request):
@@ -235,29 +248,41 @@ def login(request):
         email = request.POST.get('email')
         password = request.POST.get('password')
 
-        customer = CustomerRegister.objects.filter(
-            email=email,
-            password=password
-        ).first()
+        if not email and not password:
+            return render(request, 'login.html', {'error': 'please enter email and password'})
+        
+        if not email:
+            return render(request, 'login.html', {'error': 'please enter email'})
+        
+        if not password:
+            return render(request, 'login.html', {'error': 'please enter password'})
+        
+        if not re.match(email_pattern, email):
+            return render(request, 'login.html', {'error': 'Enter valid email ID'})
 
-        if customer:
-            request.session['cust_id'] = customer.id
+        try:
+            customer = CustomerRegister.objects.get(email=email)
+        except:
+            return render(request, 'login.html', {'error': 'Email not found'})
+        
+        if check_password(customer.password,password):
+            return render(request, 'login.html', {'error': 'Invalid password'})
 
-            # Generate OTP
-            otp = random.randint(100000, 999999)
-            print('otp: ', otp)
-            request.session['otp'] = otp
-            send_mail(
-                'OTP Verification',
-                f'Your OTP is {otp}',
-                None,
-                [customer.email],
-            )
-            return redirect('/otp2')
-        else:
-            return render(request, 'login.html', {'error': 'Invalid credentials'})
-
+        request.session['cust_id'] = customer.id
+        # Generate OTP
+        otp = random.randint(100000, 999999)
+        print('otp: ', otp)
+        request.session['otp'] = otp
+        send_mail(
+            'OTP Verification',
+            f'Your OTP is {otp}',
+            None,
+            [customer.email],
+        )
+        return redirect('/otp2')
     return render(request, 'login.html')
+
+
 
 
 def otp_verify2(request):
@@ -266,7 +291,8 @@ def otp_verify2(request):
         print('otp_session: ', type(otp_session))
         otp_input=request.POST.get('otpget')
         print('otp_input: ', type(otp_input))
-
+        if not otp_input:
+            return render(request, 'otp2.html', {'error': 'Enter OTP'})
         if int(otp_input) == otp_session:
             request.session['otp'] = ''
             return redirect('/')
