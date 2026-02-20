@@ -25,3 +25,8 @@ class Hobbies(models.Model):
     hobby = models.CharField(max_length=50)
 
 
+class Student(models.Model):
+    name=models.CharField(max_length=15)
+    age=models.IntegerField()
+
+

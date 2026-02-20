@@ -9,6 +9,8 @@ from .models import *
 from django.core.mail import EmailMessage,send_mail
 import re
 
+
+
 from django.core.paginator import Paginator,EmptyPage,PageNotAnInteger
 # ---------- AGE CALCULATION -----------
 def age(customer):
@@ -86,7 +88,7 @@ def home(request):
             if not re.match(email_pattern, email):
                 error="Proper email_Id set"
                 listof_error.append(error)
-        if CustomerRegister.objects.filter(email=email):
+        if CustomerRegister.objects.get(email=email):
             error="Used diffrent email ID "
             listof_error.append(error)
 
@@ -169,6 +171,7 @@ def home(request):
 #     if request.method == "POST":
 #         email = request.POST.get('email')
 #         password = request.POST.get('password')
+
 
 #         customer = CustomerRegister.objects.filter(
 #             email=email,
@@ -287,7 +290,10 @@ def login(request):
 
 
 def otp_verify2(request):
+    c=request.session.get('cust_id')
+    cus=CustomerRegister.objects.get(id=c)
     if request.method == "POST":
+        
         otp_session=request.session.get('otp')
         print('otp_session: ', type(otp_session))
         otp_input=request.POST.get('otpget')
@@ -296,6 +302,12 @@ def otp_verify2(request):
             return render(request, 'otp2.html', {'error': 'Enter OTP'})
         if int(otp_input) == otp_session:
             request.session['otp'] = ''
+            EmailMessage(
+                'Successfull register',
+                "registration complate",
+                None,
+                [cus.email]
+            ).send()
             return redirect('/dashboard')
         else:
             return render(request, 'otp2.html', {'error': 'Invalid OTP'})
@@ -304,6 +316,7 @@ def otp_verify2(request):
 
 def customer_list(request):
     c=CustomerRegister.objects.prefetch_related('age', 'hobby')
+    
     pag=Paginator(c,1)
     page=request.GET.get('page')
     try:
@@ -328,3 +341,34 @@ def dashboard(request):
 def logout(request):
     request.session.pop('cust_id',None)
     return redirect('/')
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from  .serializers import *
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def rest_frame(request):
+    return Response({'status': 200, 'message': 'view successfully'})
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def student_list(request):
+    s=Student.objects.all()
+    student=StudentSerializer(s,many=True)
+    return Response(student.data)
+    
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def student_add(request):
+    stu=StudentSerializer(data=request.data)
+
+    if stu.is_valid():
+        stu.save()
+        return Response(stu.data)
+    
+    return Response(stu.errors)
