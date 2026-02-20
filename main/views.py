@@ -86,7 +86,7 @@ def home(request):
             if not re.match(email_pattern, email):
                 error="Proper email_Id set"
                 listof_error.append(error)
-        if CustomerRegister.objects.get(email=email):
+        if CustomerRegister.objects.filter(email=email):
             error="Used diffrent email ID "
             listof_error.append(error)
 
@@ -244,6 +244,7 @@ def home(request):
 
 
 def login(request):
+
     if request.method == "POST":
         email = request.POST.get('email')
         password = request.POST.get('password')
@@ -295,7 +296,7 @@ def otp_verify2(request):
             return render(request, 'otp2.html', {'error': 'Enter OTP'})
         if int(otp_input) == otp_session:
             request.session['otp'] = ''
-            return redirect('/')
+            return redirect('/dashboard')
         else:
             return render(request, 'otp2.html', {'error': 'Invalid OTP'})
     return render(request, 'otp2.html')
@@ -317,3 +318,13 @@ def customer_list(request):
     x={'customer':c}
     return render(request, 'customer_list.html',x)
 
+
+def dashboard(request):
+    if request.session.get('cust_id'):
+        return render(request,'dashboard.html')
+    else:
+        return redirect('/')
+
+def logout(request):
+    request.session.pop('cust_id',None)
+    return redirect('/')
